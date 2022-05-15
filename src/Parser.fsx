@@ -60,8 +60,8 @@ let literalNode =
 
 let operaterNode =
     let nil    = anyOf (stringToChars "c") >| (fun op -> Nil op)
-    let single = anyOf (stringToChars "¬d@.∑") >| (fun op -> Single op)
-    let double = anyOf (stringToChars "+-*/") >| (fun op -> Double op)
+    let single = anyOf (stringToChars "¬d.@*∑") >| (fun op -> Single op)
+    let double = anyOf (stringToChars "+-⋅÷") >| (fun op -> Double op)
     let triple = anyOf (stringToChars "?") >| (fun op -> Triple op)
 
     choice [nil; single; double; triple]

@@ -9,7 +9,10 @@ type StackNode =
     | String of string
     | Quote  of StackNode list
     | List   of StackNode list
-    | Op     of char
+    | Nil    of char
+    | Single of char
+    | Double of char
+    | Triple of char
 
 type EvalResult<'a> =
     | Success of 'a
@@ -54,7 +57,7 @@ let doubleOps =
                 | (Int a, Float b)   -> push evaluator (Float ((float a) - b))
                 | (Float a, Int b)   -> push evaluator (Float (a - (float b)))
                 | (a, b) -> Failure (sprintf "Cannot apply (-) on %A and %A" a b))
-        ('*', fun evaluator a b ->
+        ('⋅', fun evaluator a b ->
             match (a, b) with
                 | (Int a, Int b)     -> push evaluator (Int (a * b))
                 | (Float a, Float b) -> push evaluator (Float (a * b))
@@ -63,7 +66,7 @@ let doubleOps =
                 | (String a, Int b)  -> push evaluator (String (String.replicate b a))
                 | (Int a, String b)  -> push evaluator (String (String.replicate a b))
                 | (a, b) -> Failure (sprintf "Cannot apply (*) on %A and %A" a b))
-        ('/', fun evaluator a b ->
+        ('÷', fun evaluator a b ->
             match (a, b) with
                 | (Int a, Int b)     -> push evaluator (Int (a / b))
                 | (Float a, Float b) -> push evaluator (Float (a / b))
@@ -84,10 +87,10 @@ let rec eval evaluator node =
 
             let rec quoteEval e node =
                 match node with
-                    | Node.Nil ch    -> push e (Op ch)
-                    | Node.Single ch -> push e (Op ch)
-                    | Node.Double ch -> push e (Op ch)
-                    | Node.Triple ch -> push e (Op ch)
+                    | Node.Nil ch    -> push e (Nil ch)
+                    | Node.Single ch -> push e (Single ch)
+                    | Node.Double ch -> push e (Double ch)
+                    | Node.Triple ch -> push e (Triple ch)
                     | a -> eval e node
 
             let result =
@@ -130,6 +133,27 @@ let rec eval evaluator node =
                         Success Unit
                     | Failure err -> Failure err
             | 'd' -> dup evaluator
+            | '*' ->
+                pop evaluator
+                |> function
+                    | Success a ->
+                        match a with
+                            | Quote nodes ->
+                                evaluator.stack <- nodes @ evaluator.stack
+                                Success Unit
+                            | a -> Failure (sprintf "Cannot apply (*) on %A\nPlease use (⋅) for multiplication" a)
+                    | Failure err -> Failure err
+            | '@' ->
+                pop evaluator
+                |> function
+                    | Success a ->
+                        match a with
+                            | Nil    ch -> eval evaluator (Node.Nil ch)
+                            | Single ch -> eval evaluator (Node.Single ch)
+                            | Double ch -> eval evaluator (Node.Double ch)
+                            | Triple ch -> eval evaluator (Node.Triple ch)
+                            | a -> Failure (sprintf "Cannot apply (@) on %A" a)
+                    | Failure err -> Failure err
             | op -> Failure (sprintf "Unknown operator %A" op)
         | Node.Double op ->
             let mutable a = pop evaluator
