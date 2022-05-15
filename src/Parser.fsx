@@ -6,6 +6,7 @@ type Node =
     | Float  of float
     | Bool   of bool
     | String of string
+    | Cons   of Node list
     | List   of Node list
     | Nil    of char
     | Single of char
@@ -13,7 +14,7 @@ type Node =
     | Triple of char
 
 /// Parse a single literal
-let literal =
+let literalNode =
     let intNode =
         int
         >| (fun i -> Int i)
@@ -51,3 +52,36 @@ let literal =
         >| (fun s -> String s)
 
     intNode <|> floatNode <|> boolNode <|> stringNode
+    <?> "literal"
+
+let operaterNode =
+    let nil =
+        anyOf (stringToChars "c")
+        >| (fun c -> Nil c)
+    let single =
+        anyOf (stringToChars "¬d@.∑")
+        >| (fun c -> Single c)
+    let double =
+        anyOf (stringToChars "+-*/")
+        >| (fun c -> Double c)
+    let triple =
+        anyOf (stringToChars "?")
+        >| (fun c -> Triple c)
+
+    nil <|> single <|> double <|> triple
+    <?> "operator"
+
+let consNode =
+    char '(' &> sepBy (literalNode <|> operaterNode) spaces <& char ')'
+    >| (fun l -> Cons l)
+    <?> "cons"
+
+let listNode =
+    char '[' &> sepBy1 literalNode spaces <& char ']'
+    >| (fun l -> List l)
+    <?> "list"
+
+let parseNode =
+    literalNode <|> operaterNode <|> consNode <|> listNode
+let parseNodes =
+    sepBy parseNode spaces

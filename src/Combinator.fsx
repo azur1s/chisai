@@ -45,10 +45,9 @@ module InputState =
                 let newState = { input with pos = newPos }
                 newState, Some char
             else
-                let char = '\n'
                 let newPos = incrementLine input.pos
                 let newState = {input with pos = newPos }
-                newState, Some char
+                newState, Some '\n'
 
 type ParserPosition = {
     currentLine : string
