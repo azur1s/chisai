@@ -15,21 +15,6 @@ let usage exitCode =
 [<EntryPoint>]
 let main args =
 
-    let evaluator = initEvaluator
-    printfn "Init %A" evaluator
-    push evaluator (Float 4.20) |> ignore
-    printfn "Push %A" evaluator
-    push evaluator (Int 69) |> ignore
-    printfn "Push %A" evaluator
-    dup evaluator |> ignore
-    printfn "Dup  %A" evaluator
-    pop evaluator |> ignore
-    printfn "Pop  %A" evaluator
-    pop evaluator |> ignore
-    printfn "Pop  %A" evaluator
-
-    exit 0
-
     // Handle arguments
     if args.Length < 1 then
         usage 1
@@ -59,7 +44,7 @@ let main args =
 
             let mutable evaluator = initEvaluator
 
-            // evalNodes &evaluator nodes
+            evalAll evaluator nodes
 
             exit 0
         | Parser.Failure err ->
