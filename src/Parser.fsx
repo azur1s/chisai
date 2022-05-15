@@ -7,7 +7,7 @@ type Node =
     | Float  of float
     | Bool   of bool
     | String of string
-    | Cons   of Node list
+    | Quote   of Node list
     | List   of Node list
     | Nil    of char
     | Single of char
@@ -67,10 +67,10 @@ let operaterNode =
     choice [nil; single; double; triple]
     <?> "operator"
 
-let consNode =
+let QuoteNode =
     char '(' &> sepBy (literalNode <|> operaterNode) spaces <& char ')'
-    >| (fun l -> Cons l)
-    <?> "cons"
+    >| (fun l -> Quote l)
+    <?> "quote"
 
 let listNode =
     char '[' &> sepBy1 literalNode spaces <& char ']'
@@ -78,7 +78,7 @@ let listNode =
     <?> "list"
 
 let parseNode =
-    choice [literalNode; operaterNode; consNode; listNode]
+    choice [literalNode; operaterNode; QuoteNode; listNode]
     <?> "node"
 let parseNodes =
     sepBy1 parseNode spaces

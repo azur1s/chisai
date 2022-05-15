@@ -42,7 +42,7 @@ let main args =
         | Parser.Success nodes ->
             if debug then printfn "Parsed%A\n" nodes
 
-            let mutable evaluator = initEvaluator
+            let mutable evaluator = { stack = [] }
 
             evalAll evaluator nodes debug
 

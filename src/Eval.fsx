@@ -7,9 +7,9 @@ type StackNode =
     | Float  of float
     | Bool   of bool
     | String of string
-    | Cons   of Node list
-    | List   of Node list
-    | Op     of char * (StackNode list -> StackNode)
+    | Quote  of StackNode list
+    | List   of StackNode list
+    | Op     of char
 
 type EvalResult<'a> =
     | Success of 'a
@@ -18,7 +18,6 @@ type EvalResult<'a> =
 type Evaluator = {
     mutable stack : StackNode list
 }
-let initEvaluator = { stack = [] }
 
 let push evaluator node =
     evaluator.stack <- node :: evaluator.stack
@@ -42,45 +41,85 @@ let doubleOps =
     [
         ('+', fun evaluator a b ->
             match (a, b) with
-                | (Int a, Int b) -> push evaluator (Int (a + b))
-                | (Float a, Float b) -> push evaluator (Float (a + b))
-                | (Int a, Float b) -> push evaluator (Float ((float a) + b))
-                | (Float a, Int b) -> push evaluator (Float (a + (float b)))
+                | (Int a, Int b)       -> push evaluator (Int (a + b))
+                | (Float a, Float b)   -> push evaluator (Float (a + b))
+                | (Int a, Float b)     -> push evaluator (Float ((float a) + b))
+                | (Float a, Int b)     -> push evaluator (Float (a + (float b)))
                 | (String a, String b) -> push evaluator (String (a + b))
                 | (a, b) -> Failure (sprintf "Cannot apply (+) on %A and %A" a b))
         ('-', fun evaluator a b ->
             match (a, b) with
-                | (Int a, Int b) -> push evaluator (Int (a - b))
+                | (Int a, Int b)     -> push evaluator (Int (a - b))
                 | (Float a, Float b) -> push evaluator (Float (a - b))
-                | (Int a, Float b) -> push evaluator (Float ((float a) - b))
-                | (Float a, Int b) -> push evaluator (Float (a - (float b)))
+                | (Int a, Float b)   -> push evaluator (Float ((float a) - b))
+                | (Float a, Int b)   -> push evaluator (Float (a - (float b)))
                 | (a, b) -> Failure (sprintf "Cannot apply (-) on %A and %A" a b))
         ('*', fun evaluator a b ->
             match (a, b) with
-                | (Int a, Int b) -> push evaluator (Int (a * b))
+                | (Int a, Int b)     -> push evaluator (Int (a * b))
                 | (Float a, Float b) -> push evaluator (Float (a * b))
-                | (Int a, Float b) -> push evaluator (Float ((float a) * b))
-                | (Float a, Int b) -> push evaluator (Float (a * (float b)))
-                | (String a, Int b) -> push evaluator (String (String.replicate b a))
-                | (Int a, String b) -> push evaluator (String (String.replicate a b))
+                | (Int a, Float b)   -> push evaluator (Float ((float a) * b))
+                | (Float a, Int b)   -> push evaluator (Float (a * (float b)))
+                | (String a, Int b)  -> push evaluator (String (String.replicate b a))
+                | (Int a, String b)  -> push evaluator (String (String.replicate a b))
                 | (a, b) -> Failure (sprintf "Cannot apply (*) on %A and %A" a b))
         ('/', fun evaluator a b ->
             match (a, b) with
-                | (Int a, Int b) -> push evaluator (Int (a / b))
+                | (Int a, Int b)     -> push evaluator (Int (a / b))
                 | (Float a, Float b) -> push evaluator (Float (a / b))
-                | (Int a, Float b) -> push evaluator (Float ((float a) / b))
-                | (Float a, Int b) -> push evaluator (Float (a / (float b)))
+                | (Int a, Float b)   -> push evaluator (Float ((float a) / b))
+                | (Float a, Int b)   -> push evaluator (Float (a / (float b)))
                 | (a, b) -> Failure (sprintf "Cannot apply (/) on %A and %A" a b))
     ]
 
-let eval evaluator node =
+let rec eval evaluator node =
     match node with
-        | Node.Unit -> Success Unit
-        | Node.Int i -> push evaluator (Int i)
-        | Node.Float f -> push evaluator (Float f)
-        | Node.Bool b -> push evaluator (Bool b)
+        | Node.Unit     -> Success Unit
+        | Node.Int i    -> push evaluator (Int i)
+        | Node.Float f  -> push evaluator (Float f)
+        | Node.Bool b   -> push evaluator (Bool b)
         | Node.String s -> push evaluator (String s)
-        | Node.List nodes -> push evaluator (List nodes)
+        | Node.Quote nodes ->
+            let newEvaluator = { stack = [] }
+
+            let rec quoteEval e node =
+                match node with
+                    | Node.Nil ch    -> push e (Op ch)
+                    | Node.Single ch -> push e (Op ch)
+                    | Node.Double ch -> push e (Op ch)
+                    | Node.Triple ch -> push e (Op ch)
+                    | a -> eval e node
+
+            let result =
+                nodes
+                |> List.map (quoteEval newEvaluator)
+
+            let failures =
+                result
+                // Get all the Failure's error message
+                |> List.map (fun er ->
+                    match er with
+                        | Success node -> None
+                        | Failure err -> Some err)
+                // Eliminate all None
+                |> List.choose id
+
+            if failures.Length > 0 then
+                Failure (failures |> String.concat "\n")
+            else
+                evaluator.stack <- (Quote newEvaluator.stack) :: evaluator.stack
+                Success Unit
+        | Node.List nodes ->
+            nodes
+            |> List.map (eval evaluator)
+            |> List.map (fun er ->
+                    match er with
+                        | Success node -> None
+                        | Failure err -> Some err)
+            |> List.choose id
+            |> function
+                | [] -> Success Unit
+                | errs -> Failure (errs |> String.concat "\n")
         | Node.Single op ->
             match op with
             | '.' ->
@@ -104,7 +143,6 @@ let eval evaluator node =
                         | None -> Failure (sprintf "Unknown operator %A" op)
                 | (Failure a, _) -> Failure a
                 | (_, Failure b) -> Failure b
-
         | node -> Failure (sprintf "Unknown node %A" node)
 
 let evalAll (evaluator : Evaluator) (nodes : Node list) debug =
