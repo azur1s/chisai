@@ -40,11 +40,11 @@ let main args =
 
     match parse content with
         | Parser.Success nodes ->
-            if debug then printfn "%A" nodes
+            if debug then printfn "Parsed%A\n" nodes
 
             let mutable evaluator = initEvaluator
 
-            evalAll evaluator nodes
+            evalAll evaluator nodes debug
 
             exit 0
         | Parser.Failure err ->
