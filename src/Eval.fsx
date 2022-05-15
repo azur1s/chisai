@@ -38,6 +38,41 @@ let dup evaluator =
         evaluator.stack <- node :: evaluator.stack
         Success Unit
 
+let doubleOps =
+    [
+        ('+', fun evaluator a b ->
+            match (a, b) with
+                | (Int a, Int b) -> push evaluator (Int (a + b))
+                | (Float a, Float b) -> push evaluator (Float (a + b))
+                | (Int a, Float b) -> push evaluator (Float ((float a) + b))
+                | (Float a, Int b) -> push evaluator (Float (a + (float b)))
+                | (String a, String b) -> push evaluator (String (a + b))
+                | (a, b) -> Failure (sprintf "Cannot apply (+) on %A and %A" a b))
+        ('-', fun evaluator a b ->
+            match (a, b) with
+                | (Int a, Int b) -> push evaluator (Int (a - b))
+                | (Float a, Float b) -> push evaluator (Float (a - b))
+                | (Int a, Float b) -> push evaluator (Float ((float a) - b))
+                | (Float a, Int b) -> push evaluator (Float (a - (float b)))
+                | (a, b) -> Failure (sprintf "Cannot apply (-) on %A and %A" a b))
+        ('*', fun evaluator a b ->
+            match (a, b) with
+                | (Int a, Int b) -> push evaluator (Int (a * b))
+                | (Float a, Float b) -> push evaluator (Float (a * b))
+                | (Int a, Float b) -> push evaluator (Float ((float a) * b))
+                | (Float a, Int b) -> push evaluator (Float (a * (float b)))
+                | (String a, Int b) -> push evaluator (String (String.replicate b a))
+                | (Int a, String b) -> push evaluator (String (String.replicate a b))
+                | (a, b) -> Failure (sprintf "Cannot apply (*) on %A and %A" a b))
+        ('/', fun evaluator a b ->
+            match (a, b) with
+                | (Int a, Int b) -> push evaluator (Int (a / b))
+                | (Float a, Float b) -> push evaluator (Float (a / b))
+                | (Int a, Float b) -> push evaluator (Float ((float a) / b))
+                | (Float a, Int b) -> push evaluator (Float (a / (float b)))
+                | (a, b) -> Failure (sprintf "Cannot apply (/) on %A and %A" a b))
+    ]
+
 let eval evaluator node =
     match node with
         | Node.Unit -> Success Unit
@@ -58,47 +93,18 @@ let eval evaluator node =
             | 'd' -> dup evaluator
             | op -> Failure (sprintf "Unknown operator %A" op)
         | Node.Double op ->
-            match op with
-            | '+' ->
-                let mutable a = pop evaluator
-                let mutable b = pop evaluator
-                match (a, b) with
-                | (Success (Int a), Success (Int b)) -> push evaluator (Int (a + b))
-                | (Success (Float a), Success (Float b)) -> push evaluator (Float (a + b))
-                | (Success (Int a), Success (Float b)) -> push evaluator (Float ((float a) + b))
-                | (Success (Float a), Success (Int b)) -> push evaluator (Float (a + (float b)))
-                | (Success (String a), Success (String b)) -> push evaluator (String (a + b))
-                | (a, b) -> Failure (sprintf "Cannot apply (+) on %A and %A" a b)
-            | '-' ->
-                let mutable a = pop evaluator
-                let mutable b = pop evaluator
-                match (a, b) with
-                | (Success (Int a), Success (Int b)) -> push evaluator (Int (a - b))
-                | (Success (Float a), Success (Float b)) -> push evaluator (Float (a - b))
-                | (Success (Int a), Success (Float b)) -> push evaluator (Float ((float a) - b))
-                | (Success (Float a), Success (Int b)) -> push evaluator (Float (a - (float b)))
-                | (a, b) -> Failure (sprintf "Cannot apply (-) on %A and %A" a b)
-            | '*' ->
-                let mutable a = pop evaluator
-                let mutable b = pop evaluator
-                match (a, b) with
-                | (Success (Int a), Success (Int b)) -> push evaluator (Int (a * b))
-                | (Success (Float a), Success (Float b)) -> push evaluator (Float (a * b))
-                | (Success (Int a), Success (Float b)) -> push evaluator (Float ((float a) * b))
-                | (Success (Float a), Success (Int b)) -> push evaluator (Float (a * (float b)))
-                | (Success (String a), Success (Int b)) -> push evaluator (String (String.replicate b a))
-                | (Success (Int a), Success (String b)) -> push evaluator (String (String.replicate a b))
-                | (a, b) -> Failure (sprintf "Cannot apply (*) on %A and %A" a b)
-            | '/' ->
-                let mutable a = pop evaluator
-                let mutable b = pop evaluator
-                match (a, b) with
-                | (Success (Int a), Success (Int b)) -> push evaluator (Int (a / b))
-                | (Success (Float a), Success (Float b)) -> push evaluator (Float (a / b))
-                | (Success (Int a), Success (Float b)) -> push evaluator (Float ((float a) / b))
-                | (Success (Float a), Success (Int b)) -> push evaluator (Float (a / (float b)))
-                | (a, b) -> Failure (sprintf "Cannot apply (/) on %A and %A" a b)
-            | op -> Failure (sprintf "Unknown operator %A" op)
+            let mutable a = pop evaluator
+            let mutable b = pop evaluator
+            match (a, b) with
+                | (Success a, Success b) ->
+                    doubleOps
+                    |> List.tryFind (fun (s, _) -> s = op)
+                    |> function
+                        | Some (_, fn) -> fn evaluator a b
+                        | None -> Failure (sprintf "Unknown operator %A" op)
+                | (Failure a, _) -> Failure a
+                | (_, Failure b) -> Failure b
+
         | node -> Failure (sprintf "Unknown node %A" node)
 
 let evalAll (evaluator : Evaluator) (nodes : Node list) debug =
