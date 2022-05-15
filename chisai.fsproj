@@ -6,9 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Combinator.fsx"/>
-    <Compile Include="Parser.fsx"/>
-    <Compile Include="Main.fsx"/>
+    <Compile Include="src/Combinator.fsx"/>
+    <Compile Include="src/Parser.fsx"/>
+    <Compile Include="src/Main.fsx"/>
   </ItemGroup>
 
 </Project>
