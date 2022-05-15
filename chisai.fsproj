@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="src/Combinator.fsx"/>
     <Compile Include="src/Parser.fsx"/>
+    <Compile Include="src/Eval.fsx"/>
     <Compile Include="src/Main.fsx"/>
   </ItemGroup>
 

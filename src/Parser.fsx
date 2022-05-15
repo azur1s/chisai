@@ -2,19 +2,20 @@
 open Combinator
 
 type Node =
+    | Unit
     | Int    of int
     | Float  of float
     | Bool   of bool
     | String of string
     | Cons   of Node list
     | List   of Node list
-    | Nil    of char
-    | Single of char
-    | Double of char
-    | Triple of char
+    | Op     of char
 
 /// Parse a single literal
 let literalNode =
+    let unitNode =
+        word "u" >| (fun _ -> Unit)
+
     let intNode =
         int
         >| (fun i -> Int i)
@@ -51,24 +52,26 @@ let literalNode =
         char '\"' &> manyChars (unescapeChar <|> escapedChar) <& char '\"'
         >| (fun s -> String s)
 
-    intNode <|> floatNode <|> boolNode <|> stringNode
+    unitNode <|> intNode <|> floatNode <|> boolNode <|> stringNode
     <?> "literal"
 
 let operaterNode =
-    let nil =
-        anyOf (stringToChars "c")
-        >| (fun c -> Nil c)
-    let single =
-        anyOf (stringToChars "¬d@.∑")
-        >| (fun c -> Single c)
-    let double =
-        anyOf (stringToChars "+-*/")
-        >| (fun c -> Double c)
-    let triple =
-        anyOf (stringToChars "?")
-        >| (fun c -> Triple c)
+    let ops =
+        [
+        // Nil operator (no argument)
+        "c"
+        // Single operator (one argument)
+        "¬d@.∑"
+        // Double operator (two arguments)
+        "+-*/"
+        // Triple operator (three arguments)
+        "?"
+        ]
+        |> String.concat ""
+        |> stringToChars
 
-    nil <|> single <|> double <|> triple
+    anyOf ops
+    >| (fun op -> Op op)
     <?> "operator"
 
 let consNode =
@@ -82,6 +85,24 @@ let listNode =
     <?> "list"
 
 let parseNode =
-    literalNode <|> operaterNode <|> consNode <|> listNode
+    (literalNode <|> operaterNode <|> consNode <|> listNode)
+    <?> "node"
 let parseNodes =
-    sepBy parseNode spaces
+    sepBy1 parseNode spaces
+
+type ParseResult =
+    | Success of Node list
+    | Failure of string
+
+let parse input =
+    match run parseNodes input with
+        | Combinator.Success (value, _) ->
+            Success value
+        | Combinator.Failure (label, error, pos) ->
+            let esc = "\x1b"
+            let red = esc + "[31m"
+            let reset = esc + "[0m"
+
+            let header = sprintf "Error parsing %s (Line %i, Column %i):" label pos.line pos.column
+            let preview = sprintf "    %s\n    %*s╰─ %s" pos.currentLine pos.column "" error
+            Failure (sprintf "%s\n\n%s\n" (sprintf "%s%s%s" red header reset) preview)

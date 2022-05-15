@@ -93,11 +93,11 @@ let runInput p input =
 let run p input =
     runInput p (InputState.fromStr input)
 
-/// Print the result of a parser
-let printResult result =
+/// Format result to string
+let fmtResult result =
     match result with
         | Success (value, _) ->
-            printf "%A\n" value
+            sprintf "%A\n" value
         | Failure (label, error, pos) ->
             let esc = string (char 0x1B)
             let red = esc + "[31m"
@@ -105,7 +105,7 @@ let printResult result =
 
             let header = sprintf "Error parsing %s (Line %i, Column %i):" label pos.line pos.column
             let preview = sprintf "    %s\n    %*s╰─ %s" pos.currentLine pos.column "" error
-            printfn "%s\n\n%s" (sprintf "%s%s%s" red header reset) preview
+            sprintf "%s\n\n%s\n" (sprintf "%s%s%s" red header reset) preview
 
 // ==============================================
 // Parser Combinators
