@@ -9,7 +9,10 @@ type Node =
     | String of string
     | Cons   of Node list
     | List   of Node list
-    | Op     of char
+    | Nil    of char
+    | Single of char
+    | Double of char
+    | Triple of char
 
 /// Parse a single literal
 let literalNode =
@@ -52,26 +55,16 @@ let literalNode =
         char '\"' &> manyChars (unescapeChar <|> escapedChar) <& char '\"'
         >| (fun s -> String s)
 
-    unitNode <|> intNode <|> floatNode <|> boolNode <|> stringNode
+    choice [unitNode; intNode; floatNode; boolNode; stringNode]
     <?> "literal"
 
 let operaterNode =
-    let ops =
-        [
-        // Nil operator (no argument)
-        "c"
-        // Single operator (one argument)
-        "¬d@.∑"
-        // Double operator (two arguments)
-        "+-*/"
-        // Triple operator (three arguments)
-        "?"
-        ]
-        |> String.concat ""
-        |> stringToChars
+    let nil    = anyOf (stringToChars "c") >| (fun op -> Nil op)
+    let single = anyOf (stringToChars "¬d@.∑") >| (fun op -> Single op)
+    let double = anyOf (stringToChars "+-*/") >| (fun op -> Double op)
+    let triple = anyOf (stringToChars "?") >| (fun op -> Triple op)
 
-    anyOf ops
-    >| (fun op -> Op op)
+    choice [nil; single; double; triple]
     <?> "operator"
 
 let consNode =
@@ -85,7 +78,7 @@ let listNode =
     <?> "list"
 
 let parseNode =
-    (literalNode <|> operaterNode <|> consNode <|> listNode)
+    choice [literalNode; operaterNode; consNode; listNode]
     <?> "node"
 let parseNodes =
     sepBy1 parseNode spaces
