@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Combinator.fsx"/>
     <Compile Include="Parser.fsx"/>
     <Compile Include="Main.fsx"/>
   </ItemGroup>
