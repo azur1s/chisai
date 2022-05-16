@@ -1,5 +1,5 @@
-#load "Combinator.fsx"
-open Combinator
+#r "nuget: FParsec,1.1.1"
+open FParsec
 
 type Node =
     | Unit
@@ -17,85 +17,72 @@ type Node =
 /// Parse a single literal
 let literalNode =
     let unitNode =
-        word "u" >| (fun _ -> Unit)
+        pstring "u"
+        |>> (fun _ -> Unit)
 
     let intNode =
-        int
-        >| (fun i -> Int i)
+        puint64
+        |>> (fun i -> Int (int i))
         <?> "integer"
 
     let floatNode =
-        float
-        >| (fun f -> Float f)
+        pfloat
+        |>> (fun f -> Float f)
         <?> "float"
 
     let boolNode =
-        (word "t"  >| (fun _ -> Bool true))
-        <|> (word "f" >| (fun _ -> Bool false))
+        (pstring "t" |>> (fun _ -> Bool true))
+        <|> (pstring "f" |>> (fun _ -> Bool false))
         <?> "boolean"
 
-    let unescapeChar = satisfy (fun ch -> ch <> '\\' && ch <> '\"') "character"
-
-    let escapedChar =
-        [
-        ("\\\"", '\"')
-        ("\\\\", '\\')
-        ("\\/" , '/' )
-        ("\\b" , '\b')
-        ("\\f" , '\f')
-        ("\\n" , '\n')
-        ("\\r" , '\r')
-        ("\\t" , '\t')
-        ]
-        |> List.map (fun (m, r) -> word m >| (fun _ -> r))
-        |> choice
-        <?> "escaped character"
-
     let stringNode =
-        char '\"' &> manyChars (unescapeChar <|> escapedChar) <& char '\"'
-        >| (fun s -> String s)
+        let normal = satisfy (fun c -> c <> '\\' && c <> '"')
+        let unescape c =
+            match c with
+            | 'n' -> '\n'
+            | 'r' -> '\r'
+            | 't' -> '\t'
+            | c   -> c
+        let escaped = pstring "\\" >>. (anyOf "\\nrt\"" |>> unescape)
+
+        (many (normal <|> escaped))
+        |> between (pstring "\"") (pstring "\"") 
+        |>> (fun chars -> chars |> Array.ofList |> System.String |> String)
 
     choice [unitNode; intNode; floatNode; boolNode; stringNode]
     <?> "literal"
 
-let operaterNode =
-    let nil    = anyOf (stringToChars "c") >| (fun op -> Nil op)
-    let single = anyOf (stringToChars "¬d.@*∑") >| (fun op -> Single op)
-    let double = anyOf (stringToChars "+-⋅÷") >| (fun op -> Double op)
-    let triple = anyOf (stringToChars "?") >| (fun op -> Triple op)
+let opNode =
+    let charsFrom s = Seq.toList s
+    let nil    = anyOf (charsFrom "!")      |>> (fun op -> Nil op)
+    let single = anyOf (charsFrom "¬$.@*∑") |>> (fun op -> Single op)
+    let double = anyOf (charsFrom "+-⋅÷:")  |>> (fun op -> Double op)
+    let triple = anyOf (charsFrom "?")      |>> (fun op -> Triple op)
 
     choice [nil; single; double; triple]
     <?> "operator"
 
-let QuoteNode =
-    char '(' &> sepBy (literalNode <|> operaterNode) spaces <& char ')'
-    >| (fun l -> Quote l)
+let quoteNode =
+    pstring "(" >>. sepBy (literalNode <|> opNode) spaces .>> pstring ")"
+    |>> (fun l -> Quote l)
     <?> "quote"
 
 let listNode =
-    char '[' &> sepBy1 literalNode spaces <& char ']'
-    >| (fun l -> List l)
+    pstring "[" >>. sepBy1 literalNode spaces .>> pstring "]"
+    |>> (fun l -> List l)
     <?> "list"
 
-let parseNode =
-    choice [literalNode; operaterNode; QuoteNode; listNode]
-    <?> "node"
 let parseNodes =
-    sepBy1 parseNode spaces
+    let nodes = sepEndBy1 (choice [literalNode; opNode; quoteNode; listNode]) spaces
+
+    spaces >>. nodes .>> spaces .>> eof
+    <?> "nodes"
 
 type ParseResult =
-    | Success of Node list
-    | Failure of string
+    | PSuccess of Node list
+    | PFailure of string
 
 let parse input =
     match run parseNodes input with
-        | Combinator.Success (value, _) ->
-            Success value
-        | Combinator.Failure (label, error, pos) ->
-            let esc = "\x1b"
-            let red = esc + "[31m"
-            let reset = esc + "[0m"
-
-            let header = sprintf "Error parsing %s (Line %i, Column %i):" label pos.line pos.column
-            let preview = sprintf "    %s\n    %*s╰─ %s" pos.currentLine pos.column "" error
-            Failure (sprintf "%s\n\n%s\n" (sprintf "%s%s%s" red header reset) preview)
+    | Success (value, _, _) -> PSuccess value
+    | Failure (msg, _, _) -> PFailure msg

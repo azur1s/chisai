@@ -39,7 +39,7 @@ let main args =
     let content = IO.File.ReadAllText path
 
     match parse content with
-        | Parser.Success nodes ->
+        | PSuccess nodes ->
             if debug then printfn "Parsed%A\n" nodes
 
             let mutable evaluator = { stack = [] }
@@ -47,7 +47,7 @@ let main args =
             evalAll evaluator nodes debug
 
             exit 0
-        | Parser.Failure err ->
+        | PFailure err ->
             printfn "%s" err
             exit 1
 
